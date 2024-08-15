@@ -1,0 +1,207 @@
+* {
+	box-sizing: border-box;
+}
+
+html, body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	background: #000;
+	font: 16px/1.5 sans-serif;
+}
+
+body {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+
+	--ai-color: rgb(145, 34, 12);
+}
+
+main {
+	margin: 15px;
+	width: 1024px;
+	max-width: 100%;
+	aspect-ratio: 4/3;
+	background: #eee;
+}
+
+.screen {
+	height: 100%;
+	width: 100%;
+	display: none;
+
+	&[data-active] {
+		display: block;
+	}
+}
+
+/* screens */
+#main {
+	> div {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+
+		> * {
+			display: inline-block;
+		}
+
+		h1 {
+			margin: 0;
+			margin-bottom: 15px;
+		}
+
+		button {
+			border: 0;
+			font-size: 1.5rem;
+			cursor: pointer;
+		}
+	}
+}
+
+#game {
+	> menu {
+		display: flex;
+		justify-content: space-between;
+		margin: 0;
+		padding: 2px 5px;
+		width: 100%;
+		background: #aaa;
+		height: fit-content;
+		font: 0.9rem monospace;
+
+		button {
+			border: 0;
+			font-size: 1.5rem;
+			cursor: pointer;
+		}
+	}
+}
+
+#ai {
+	display: flex;
+	background: var(--ai-color);
+	padding: 5px;
+
+	> h1 {
+		align-self: center;
+		font-size: 2rem;
+		line-height: 2rem;
+		margin: 0;
+		padding: 7px;
+
+		background: radial-gradient(ellipse at top, #68b965, transparent),
+		radial-gradient(ellipse at bottom, #577082, transparent);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		text-shadow: rgba(0, 0, 0, 0.2) 0 -2px 2px;
+
+		filter: hue-rotate(calc(var(--timeoffset) * 0.1deg));
+	}
+}
+
+#ai-status {
+	display: flex;
+	flex-grow: 1;
+	flex-direction: column;
+	justify-content: space-between;
+	gap: 5px;
+	padding: 10px;
+	padding-bottom: 5px;
+	background: rgb(184, 147, 138);
+	box-shadow: inset 3px 3px 3px -1px rgb(82, 18, 6);
+	border-radius: 5px;
+	margin-left: 5px;
+}
+
+#ai-tasks {
+	display: flex;
+	gap: 5px;
+}
+
+.ai-task {
+	position: relative;
+	width: 50px;
+	aspect-ratio: 1;
+	background: rgb(218, 218, 218);
+	box-shadow: inset 3px 3px 3px -1px rgb(100, 100, 100);
+	border-radius: 5px;
+	border: 0;
+	padding: 2px;
+	cursor: pointer;
+
+	> * {
+		width: 100%;
+		height: 100%;
+		background-image: repeating-linear-gradient(transparent 1px, transparent 19px, transparent 1px, rgba(0, 0, 0, 0.2) 20px),
+		repeating-linear-gradient(to left, transparent 1px, transparent 19px, transparent 1px, rgba(0, 0, 0, 0.2) 20px);
+		background-size: 10px 10px;
+		transition: none;
+
+		&:hover {
+			background-position: -1500px -2000px;
+			transition: background-position 100s linear;
+		}
+
+		&:empty::before {
+			content: "assign task";
+			font-variant: small-caps;
+			text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+			font-size: 0.8rem;
+			font-weight: bold;
+			display: inline-block;
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -45%);
+		}
+	}
+}
+
+/* components */
+
+#available_ai_tasks {
+	&:popover-open {
+		padding: 0;
+
+		h6 {
+			margin: 0;
+			padding: 2px 5px;
+			background: var(--ai-color);
+			color: white;
+		}
+
+		> div {
+			display: flex;
+
+			button {
+				border: unset;
+				background: unset;
+				margin: unset;
+				padding: unset;
+				font-size: 2rem;
+				cursor: pointer;
+			}
+		}
+	}
+
+	&::backdrop {
+		background: rgba(0, 0, 0, 0.5);
+	}
+}
+
+
+data {
+	width: fit-content;
+	padding: 2px;
+	font-size: 0.8rem;
+	font-family: monospace;
+	text-align: center;
+	background: rgb(0, 0, 0);
+	color: rgb(34, 189, 73);
+	border-radius: 5px;
+}

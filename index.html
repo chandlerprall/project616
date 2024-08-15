@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Project 616</title>
+	<meta charset="utf-8"/>
+	<link rel="stylesheet" type="text/css" href="styles.css"/>
+</head>
+<body>
+<main>
+	<div class="screen" id="main" data-active>
+		<div>
+			<h1>Project 616</h1>
+			<button id="start">start</button>
+		</div>
+	</div>
+	<div class="screen" id="game">
+		<menu>
+			<div></div>
+			<div>
+				<span><strong>A</strong>pocryphal <strong>I</strong>ndustries</span>
+			</div>
+		</menu>
+		<section id="ai">
+			<h1>AI</h1>
+			<div id="ai-status">
+				<div id="ai-tasks"></div>
+				<data>[🔋 usage / $$$ cost]</data>
+				<data>[💧 usage / $$$ cost]</data>
+			</div>
+		</section>
+	</div>
+</main>
+<dialog id="available_ai_tasks" popover>
+	<h6>assign task</h6>
+	<div>
+		<button>🔋</button>
+		<button>💧</button>
+		<button>❌</button>
+	</div>
+</dialog>
+<script src="script.js"></script>
+</body>
+</html>
