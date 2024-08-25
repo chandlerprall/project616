@@ -16,6 +16,7 @@ body {
 	align-items: center;
 
 	--ai-color: rgb(145, 34, 12);
+	--industry-color: rgb(173, 153, 109);
 }
 
 main {
@@ -79,20 +80,27 @@ main {
 			cursor: pointer;
 		}
 	}
+
+	& > section {
+		display: flex;
+		padding: 5px;
+
+		> h1 {
+			align-self: center;
+			font-size: 2rem;
+			line-height: 2rem;
+			letter-spacing: 0px;
+			font-kerning: none;
+			margin: 0;
+			padding: 7px;
+		}
+	}
 }
 
 #ai {
-	display: flex;
 	background: var(--ai-color);
-	padding: 5px;
 
 	> h1 {
-		align-self: center;
-		font-size: 2rem;
-		line-height: 2rem;
-		margin: 0;
-		padding: 7px;
-
 		background: radial-gradient(ellipse at top, #68b965, transparent),
 		radial-gradient(ellipse at bottom, #577082, transparent);
 		-webkit-background-clip: text;
@@ -158,6 +166,101 @@ main {
 			top: 50%;
 			left: 50%;
 			transform: translate(-50%, -45%);
+		}
+	}
+}
+
+#industry {
+	background: var(--industry-color);
+
+	> h1 {
+		writing-mode: vertical-lr;
+
+		background: radial-gradient(ellipse at top, #b9ae65, transparent),
+		radial-gradient(ellipse at bottom, #95b9e8, transparent);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		text-shadow: rgba(0, 0, 0, 0.1) 0px 0px 4px;
+
+		filter:
+			hue-rotate(
+				calc(
+					(sin(calc(var(--timeoffset) * 0.001)) + 1) * 0.5 * 360deg
+				)
+			)
+			sepia(
+				calc(
+					(sin(calc(var(--timeoffset) * 0.00027)) + 1) * 0.5 * 100%
+				)
+			)
+			contrast(100%)
+		;
+	}
+
+	#industries {
+		display: flex;
+		gap: 5px;
+
+		.industry-status {
+			display: flex;
+			flex-grow: 1;
+			flex-direction: column;
+			align-items: center;
+			padding: 10px;
+			padding-bottom: 5px;
+			background: rgb(230, 218, 191);
+			box-shadow: inset 3px 3px 3px -1px rgb(106, 100, 78);
+			border-radius: 5px;
+			margin-left: 5px;
+
+			> strong {
+				display: flex;
+				img {
+					width: 24px;
+				}
+			}
+			> meter {
+				width: 80px;
+			}
+
+			.usage {
+				font-weight: normal;
+				margin-left: 5px;
+				font-size: 0.7rem;
+			}
+
+			.inputs {
+				height: 121px;
+				display: flex;
+				flex-direction: column;
+				flex-wrap: wrap;
+				gap: 5px;
+
+				.industry-item {
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					width: 50px;
+					aspect-ratio: 1;
+					background: rgb(237, 237, 237);
+					box-shadow: inset 3px 3px 3px -1px rgb(149, 149, 149);
+					border-radius: 5px;
+					border: 0;
+					padding: 2px;
+					font-size: 0.8rem;
+
+					> img {
+						margin-top: 3px;
+						width: 24px;
+					}
+
+					> meter {
+						margin: -5px 0 0;
+						width: 95%;
+					}
+				}
+			}
 		}
 	}
 }
