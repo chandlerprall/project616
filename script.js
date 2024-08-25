@@ -1,5 +1,5 @@
-import {execute, variables, industries, commodities} from './economy.js'
-import {optimize, Execution} from './imho.js'
+import {execute, optimize, variables, industries, commodities} from './economy.js'
+import { Execution } from './imho.js'
 
 const g = document.getElementById.bind(document)
 const ce = document.createElement.bind(document)
@@ -14,32 +14,71 @@ const e = Object.entries.bind(Object)
 const b = document.body
 
 const iconUrls = {
-	coal: 'coal-svgrepo-com.svg',
-	electric: 'high-voltage-svgrepo-com.svg',
-	nuclear: 'nuclear-power-plant-svgrepo-com.svg',
-	oil: 'oil-drum-svgrepo-com.svg',
-	solar: 'solar-panels-solar-panel-svgrepo-com.svg',
-	water: 'water-drops-svgrepo-com.svg',
-	waterrecycle: 'recycle-svgrepo-com.svg',
-	wind: 'windmill-eolic-energy-svgrepo-com.svg',
+	coal: 'assets/coal-svgrepo-com.svg',
+	electric: 'assets/high-voltage-svgrepo-com.svg',
+	nuclear: 'assets/nuclear-power-plant-svgrepo-com.svg',
+	oil: 'assets/oil-drum-svgrepo-com.svg',
+	solar: 'assets/solar-panels-solar-panel-svgrepo-com.svg',
+	water: 'assets/water-drops-svgrepo-com.svg',
+	waterrecycle: 'assets/recycle-svgrepo-com.svg',
+	wind: 'assets/windmill-eolic-energy-svgrepo-com.svg',
 }
 
 const updates = [
+	// execute tasks
+	x => tasks.forEach(({ update }) => update?.(x)),
+
 	// water recycling can only use water produced
 	() => variables.set(commodities.waterrecycle.availability, execute(industries.water.production)),
 ]
 
 /* AI */
-const $available_tasks = g('available_ai_tasks')
-$available_tasks.onclick = ({target}) => {
-	tasks[assigning_task_to].slot.innerHTML = ''
-	if (target.innerHTML === '❌') {
+function assignTask(node, update) {
+	const task = tasks[assigning_task_to]
+	task.slot.innerHTML = ''
 
-	} else {
-		tasks[assigning_task_to].slot.append(target.childNodes[0].cloneNode(true))
+	if (node) {
+		task.slot.append(node)
 	}
-	$available_tasks.togglePopover()
+	task.update = update
 }
+
+const $available_tasks = g('available_ai_tasks')
+const $optimize_tasks = g('available_ai_tasks--optimize');
+const $usage_tasks = g('available_ai_tasks--usage');
+[
+	['wind', 'optimize', (x) => optimize(
+		commodities.wind.efficiency, Infinity,
+		new Map([
+			[commodities.wind.efficiency, () => variables.get(commodities.wind.efficiency) * 1.01]
+		]),
+		x / 1000
+	)],
+	['solar', 'optimize', () => {}],
+	['nuclear', 'optimize', () => {}],
+	['oil', 'optimize', () => {}],
+	['coal', 'optimize', () => {}],
+
+	['electric', 'usage', (x) => optimize(
+		industries.electric.demand, Infinity,
+		variables,
+		x / 1000 * 100
+	)],
+	['water', 'usage', (x) => optimize(
+		industries.water.demand, Infinity,
+		variables,
+		x / 1000 * 100
+	)],
+].forEach(([name, where, update]) => {
+	const button = html(`<button><span class="resourceGroup"><img src="${iconUrls[name]}" />${name}</span></button>`);
+	button.onclick = (e) => {
+		const node = e.currentTarget.children[0].cloneNode(true)
+		assignTask(node, update);
+		$available_tasks.togglePopover()
+	};
+	if (where === 'optimize') $optimize_tasks.children[1].append(button)
+	if (where === 'usage') $usage_tasks.children[1].append(button)
+})
 
 let assigning_task_to
 const tasks = (() => {
@@ -91,7 +130,7 @@ const $industries = g('industries')
 e(industries).forEach(([industry, {demand, potentialProductionNode, production}]) => {
 	const $industryStatus = html(`
 <div class="industry-status">
-	<strong><img src="assets/${iconUrls[industry]}" alt="${industry}" /> ${industry}</strong>
+	<strong><img src="${iconUrls[industry]}" alt="${industry}" /> ${industry}</strong>
 	<meter min="0" low="0" high="0.8" max="1"></meter>
 	<span class="usage"></span>
 	<div class="inputs"></div>
@@ -107,7 +146,7 @@ e(industries).forEach(([industry, {demand, potentialProductionNode, production}]
 
 		$industryStatus.children[3].append(html(`
 			<div class="industry-item">
-				<img src="assets/${iconUrls[name]}" alt="${name}" />
+				<img src="${iconUrls[name]}" alt="${name}" />
 				${displayName}
 				<meter min="0" low="0" high="0.8" max="1"></meter>
 			</div>

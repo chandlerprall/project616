@@ -264,7 +264,7 @@ export class Execution {
 	}
 }
 
-export function optimize(operation, targetValue, variablesIn, costs, maxCost) {
+export function _optimize(operation, targetValue, variablesIn, costs, maxCost) {
 	const execution = new Execution(operation, variablesIn)
 	execution.backward()
 

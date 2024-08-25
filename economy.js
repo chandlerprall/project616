@@ -9,7 +9,7 @@ import {
 	Divide,
 	Distribution,
 	Fulfillment,
-	optimize
+	_optimize
 } from './imho.js'
 
 const population = new Variable('population')
@@ -148,28 +148,28 @@ function step() {
 	const now = Date.now()
 	const progress = now - lastTime
 
-	variables = optimize(
-		industries.electric.demandMet,
-		3,
-		variables,
-		improvementCosts,
-		1 * progress
-	);
-
-	variables = optimize(
-		industries.water.demand,
-		Infinity,
-		variables,
-		improvementCosts,
-		1 * progress * 0.2
-	);
-	variables = optimize(
-		industries.water.demandMet,
-		1.5,
-		variables,
-		improvementCosts,
-		1 * progress
-	);
+	// variables = optimize(
+	// 	industries.electric.demandMet,
+	// 	3,
+	// 	variables,
+	// 	improvementCosts,
+	// 	1 * progress
+	// );
+	//
+	// variables = optimize(
+	// 	industries.water.demand,
+	// 	Infinity,
+	// 	variables,
+	// 	improvementCosts,
+	// 	1 * progress * 0.2
+	// );
+	// variables = optimize(
+	// 	industries.water.demandMet,
+	// 	1.5,
+	// 	variables,
+	// 	improvementCosts,
+	// 	1 * progress
+	// );
 
 	lastTime = now
 }
@@ -177,4 +177,8 @@ setInterval(step, 1000 / 60)
 
 export function execute(node, _variables = variables) {
 	return new Execution(node, _variables).forward()
+}
+
+export function optimize(operation, targetValue, costs, maxCost) {
+	variables = _optimize(operation, targetValue, variables, costs, maxCost)
 }
