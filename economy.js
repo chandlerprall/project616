@@ -36,6 +36,8 @@ function industry(name, potentialProductionNode) {
 
 export const commodities = {
 	coal: commodity('coal'),
+	grain: commodity('grain'),
+	meat: commodity('meat'),
 	nuclear: commodity('nuclear'),
 	oil: commodity('oil'),
 	solar: commodity('solar'),
@@ -68,11 +70,9 @@ industries.water = industry(
 )
 const waterDemandFromPopulation = new Multiply('WaterDemandFromPopulation', population, new Constant('WaterDemandFromPopulationCoefficient', 2))
 const waterDemandFromAI = new Multiply('WaterDemandFromAI', new Constant('AI', 10), new Constant('WaterDemandFromAICoefficient', 2))
-const waterDemandFromAgriculture = new Multiply('WaterDemandFromAgriculture', new Constant('Agri', 100), new Constant('WaterDemandFromAgricultureCoefficient', 2))
 industries.water.demand.include(
 	waterDemandFromPopulation,
 	waterDemandFromAI,
-	waterDemandFromAgriculture,
 )
 
 const electricDemandFromWater = new Multiply('ElectricDemandFromWater', industries.water.demand, new Constant('ElectricDemandFromWaterCoefficient', 5))
@@ -81,6 +81,23 @@ industries.electric.demand.include(
 	electricDemandFromWater,
 	electricDemandFromPopulation,
 )
+
+// configure agri industry
+industries.agri = industry(
+	'agri',
+	new Add('AgriPotentialProduction',
+		commodities.meat.potentialProduction,
+		commodities.grain.potentialProduction,
+	)
+)
+
+const agriDemandFromPopulation = new Multiply('AgriDemandFromPopulation', population, new Constant('AgriDemandFromPopulationCoefficient', 5))
+industries.agri.demand.include(
+	agriDemandFromPopulation,
+)
+
+const waterDemandFromAgriculture = new Multiply('WaterDemandFromAgriculture', industries.agri.demand, new Constant('WaterDemandFromAgricultureCoefficient', 2))
+industries.water.demand.include(waterDemandFromAgriculture)
 
 // electric fulfillment
 const waterElectricFulfillment = new Fulfillment('WaterElectricFulfillment', electricDemandFromWater, industries.electric.distribution)
@@ -116,6 +133,11 @@ export let variables = new Map([
 
 	[commodities.wind.availability, 1000],
 	[commodities.wind.efficiency, 1],
+
+	[commodities.grain.availability, 1000],
+	[commodities.grain.efficiency, 1],
+	[commodities.meat.availability, 1000],
+	[commodities.meat.efficiency, 1],
 ])
 
 const improvementCosts = new Map([
@@ -143,37 +165,9 @@ const improvementCosts = new Map([
 	[commodities.wind.efficiency, () => Math.pow(1000, variables.get(commodities.wind.efficiency))],
 ])
 
-let lastTime = Date.now()
-function step() {
-	const now = Date.now()
-	const progress = now - lastTime
-
-	// variables = optimize(
-	// 	industries.electric.demandMet,
-	// 	3,
-	// 	variables,
-	// 	improvementCosts,
-	// 	1 * progress
-	// );
-	//
-	// variables = optimize(
-	// 	industries.water.demand,
-	// 	Infinity,
-	// 	variables,
-	// 	improvementCosts,
-	// 	1 * progress * 0.2
-	// );
-	// variables = optimize(
-	// 	industries.water.demandMet,
-	// 	1.5,
-	// 	variables,
-	// 	improvementCosts,
-	// 	1 * progress
-	// );
-
-	lastTime = now
-}
-setInterval(step, 1000 / 60)
+export const society = [
+	['pop', population],
+];
 
 export function execute(node, _variables = variables) {
 	return new Execution(node, _variables).forward()

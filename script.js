@@ -1,4 +1,4 @@
-import {execute, optimize, variables, industries, commodities} from './economy.js'
+import {execute, optimize, variables, industries, commodities, society} from './economy.js'
 import { Execution } from './imho.js'
 
 const g = document.getElementById.bind(document)
@@ -14,10 +14,14 @@ const e = Object.entries.bind(Object)
 const b = document.body
 
 const iconUrls = {
+	agri: 'assets/wheat-barley-svgrepo-com.svg',
 	coal: 'assets/coal-svgrepo-com.svg',
 	electric: 'assets/high-voltage-svgrepo-com.svg',
+	grain: 'assets/wheat-barley-svgrepo-com.svg',
+	meat: 'assets/meat-on-bone-svgrepo-com.svg',
 	nuclear: 'assets/nuclear-power-plant-svgrepo-com.svg',
 	oil: 'assets/oil-drum-svgrepo-com.svg',
+	pop: 'assets/people-nearby-svgrepo-com.svg',
 	solar: 'assets/solar-panels-solar-panel-svgrepo-com.svg',
 	water: 'assets/water-drops-svgrepo-com.svg',
 	waterrecycle: 'assets/recycle-svgrepo-com.svg',
@@ -66,6 +70,11 @@ const $usage_tasks = g('available_ai_tasks--usage');
 	)],
 	['water', 'usage', (x) => optimize(
 		industries.water.demand, Infinity,
+		variables,
+		x / 1000 * 100
+	)],
+	['agri', 'usage', (x) => optimize(
+		industries.agri.demand, Infinity,
 		variables,
 		x / 1000 * 100
 	)],
@@ -125,6 +134,7 @@ function formatNumber(n, suffixes = ['', 'k', 'M', 'B', 'T']) {
 const usageFormatters = {
 	electric: x => `${formatNumber(x, [' watts', 'kw', 'mw'])}`,
 	water: x => `${formatNumber(x)} gallons`,
+	agri: x => `${formatNumber(x)} tons`,
 }
 const $industries = g('industries')
 e(industries).forEach(([industry, {demand, potentialProductionNode, production}]) => {
@@ -172,6 +182,21 @@ e(industries).forEach(([industry, {demand, potentialProductionNode, production}]
 	})
 })
 
+/* Society */
+const $society = g('society-statuses')
+society.forEach(([society, node]) => {
+	const $societyStatus = html(`
+<div class="society-item">
+	<img src="${iconUrls[society]}" alt="${society}" />
+	${society}
+	<span></span>
+</div>`)
+	$society.append($societyStatus)
+
+	updates.push(() => {
+		$societyStatus.querySelector('span').textContent = formatNumber(Math.floor(execute(node)))
+	});
+});
 
 /* Game */
 

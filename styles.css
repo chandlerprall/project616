@@ -17,6 +17,7 @@ body {
 
 	--ai-color: rgb(145, 34, 12);
 	--industry-color: rgb(173, 153, 109);
+	--society-color: rgb(107, 149, 142);
 }
 
 main {
@@ -89,7 +90,7 @@ main {
 			align-self: center;
 			font-size: 2rem;
 			line-height: 2rem;
-			letter-spacing: 0px;
+			letter-spacing: 0;
 			font-kerning: none;
 			margin: 0;
 			padding: 7px;
@@ -133,7 +134,7 @@ main {
 
 .ai-task {
 	position: relative;
-	width: 50px;
+	width: 60px;
 	aspect-ratio: 1;
 	background: rgb(218, 218, 218);
 	box-shadow: inset 3px 3px 3px -1px rgb(100, 100, 100);
@@ -184,7 +185,7 @@ main {
 		-webkit-background-clip: text;
 		background-clip: text;
 		-webkit-text-fill-color: transparent;
-		text-shadow: rgba(0, 0, 0, 0.1) 0px 0px 4px;
+		text-shadow: rgba(0, 0, 0, 0.1) 0 0 4px;
 
 		filter:
 			hue-rotate(
@@ -198,7 +199,7 @@ main {
 				)
 			)
 			contrast(100%)
-		;
+	;
 	}
 
 	#industries {
@@ -234,7 +235,7 @@ main {
 			}
 
 			.inputs {
-				height: 121px;
+				height: 125px;
 				display: flex;
 				flex-direction: column;
 				flex-wrap: wrap;
@@ -244,7 +245,7 @@ main {
 					display: flex;
 					flex-direction: column;
 					align-items: center;
-					width: 50px;
+					width: 60px;
 					aspect-ratio: 1;
 					background: rgb(237, 237, 237);
 					box-shadow: inset 3px 3px 3px -1px rgb(149, 149, 149);
@@ -263,6 +264,70 @@ main {
 						width: 95%;
 					}
 				}
+			}
+		}
+	}
+}
+
+#society {
+	background: var(--society-color);
+
+	> h1 {
+		writing-mode: vertical-lr;
+
+		background: radial-gradient(ellipse at top, #b9ae65, transparent),
+		radial-gradient(ellipse at bottom, #95b9e8, transparent);
+		-webkit-background-clip: text;
+		background-clip: text;
+		-webkit-text-fill-color: transparent;
+		text-shadow: rgba(0, 0, 0, 0.1) 0 0 4px;
+
+		filter:
+			hue-rotate(
+				calc(
+					(sin(calc((var(--timeoffset) + 100) * 0.0012)) + 1) * 0.5 * 360deg
+				)
+			)
+			sepia(
+				calc(
+					(sin(calc((var(--timeoffset) + 100) * 0.00027)) + 1) * 0.5 * 100%
+				)
+			)
+			contrast(100%)
+		;
+	}
+
+	#society-statuses {
+		display: flex;
+		flex-grow: 1;
+		flex-direction: column;
+		padding: 10px;
+		padding-bottom: 5px;
+		border-radius: 5px;
+		margin-left: 5px;
+		gap: 5px;
+
+		.society-item {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			width: 60px;
+			aspect-ratio: 1;
+			background: rgb(237, 237, 237);
+			box-shadow: inset 3px 3px 3px -1px rgb(149, 149, 149);
+			border-radius: 5px;
+			border: 0;
+			padding: 2px;
+			font-size: 0.8rem;
+
+			> img {
+				margin-top: 3px;
+				width: 24px;
+			}
+
+			> meter {
+				margin: -5px 0 0;
+				width: 95%;
 			}
 		}
 	}
