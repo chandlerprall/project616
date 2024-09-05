@@ -32,6 +32,7 @@ export class Constant extends Operation {
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
 		return 0
 	}
@@ -50,6 +51,7 @@ export class Variable extends Operation {
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
 		return 1
 	}
@@ -70,6 +72,7 @@ export class Power extends Operation {
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
 		const x = this.a.forward(execution)
 		const n = this.b.forward(execution)
@@ -81,6 +84,32 @@ export class Power extends Operation {
 		this.b.backward(execution, b)
 
 		return n * Math.pow(x, n - 1)
+	}
+}
+
+export class Log1P extends Operation {
+	constructor(name, x) {
+		super(name)
+		this.x = x
+	}
+
+	forward(execution) {
+		if (execution.values.has(this)) return execution.values.get(this)
+		const value = Math.log1p(this.x.forward(execution))
+		execution.values.set(this, value)
+		return value
+	}
+
+	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
+		this.grade(execution, this, gradient)
+		const x = this.x.forward(execution)
+
+		const dx = gradient / (1 + x)
+
+		this.x.backward(execution, dx)
+
+		return dx
 	}
 }
 
@@ -101,6 +130,7 @@ export class Add extends Operation {
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
 		let result = 0
 		for (const input of this.inputs) {
@@ -114,7 +144,34 @@ export class Add extends Operation {
 	}
 }
 
+export class Subtract extends Operation {
+	constructor(name, a, b) {
+		super(name)
+		this.a = a
+		this.b = b
+	}
+
+	forward(execution) {
+		if (execution.values.has(this)) return execution.values.get(this)
+		const value = this.a.forward(execution) - this.b.forward(execution)
+		execution.values.set(this, value)
+		return value
+	}
+
+	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
+		this.grade(execution, this, gradient)
+		const a = this.a.forward(execution)
+		const b = this.b.forward(execution)
+		const da = this.a.backward(execution, a * gradient)
+		const db = this.b.backward(execution, b * -gradient)
+		return da - db
+	}
+}
+
 export class Min extends Operation {
+	leaky = false
+
 	constructor(name, a, b) {
 		super(name)
 		this.a = a
@@ -129,62 +186,77 @@ export class Min extends Operation {
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
-		const smallestSide = this.a.forward(execution) < this.b.forward(execution) ? this.a : this.b
-		return this.a.backward(execution, smallestSide === this.a ? gradient : 0) + this.b.backward(execution, smallestSide === this.b ? gradient : 0)
+		const aVal = this.a.forward(execution)
+		const bVal = this.b.forward(execution)
+		const smallestSide = aVal === bVal ? null : (aVal < bVal ? this.a : this.b)
+		const aGradient = smallestSide !== this.b ? gradient : (this.leaky ? 0.00001 : 0)
+		const bGradient = smallestSide !== this.a ? gradient : (this.leaky ? 0.00001 : 0)
+		return this.a.backward(execution, aGradient) + this.b.backward(execution, bGradient)
 	}
 }
 
-export class Distribution extends Operation {
-	constructor(name, production, demand) {
+export class Max extends Operation {
+	constructor(name, a, b) {
 		super(name)
-		this.production = production
-		this.demand = demand
-	}
-
-	forward(execution, fulfillment) {
-		if (fulfillment == null) {
-			throw new Error('Distribution forward called by non-fulfillment node')
-		}
-		if (execution.values.has(this)) return execution.values.get(this).get(fulfillment)
-
-		const fulfillments = new Map()
-		let available = this.production.forward(execution)
-
-		this.demand.inputs.forEach((input) => {
-			const distributed = Math.min(input.forward(execution), available)
-			available -= distributed
-			fulfillments.set(input, distributed)
-		})
-
-		execution.values.set(this, fulfillments)
-		return fulfillments.get(fulfillment)
-	}
-
-	backward(execution, gradient = 1) {
-		this.grade(execution, this, gradient)
-		const smallestSide = this.demand.forward(execution) < this.production.forward(execution) ? this.demand : this.production
-		return this.demand.backward(execution, smallestSide === this.demand ? gradient : 0) + this.production.backward(execution, smallestSide === this.production ? gradient : 0)
-	}
-}
-
-export class Fulfillment extends Operation {
-	constructor(name, demand, distribution) {
-		super(name)
-		this.demand = demand
-		this.distribution = distribution
+		this.a = a
+		this.b = b
 	}
 
 	forward(execution) {
 		if (execution.values.has(this)) return execution.values.get(this)
-		const value = this.distribution.forward(execution, this.demand)
+		const value = Math.max(this.a.forward(execution), this.b.forward(execution))
 		execution.values.set(this, value)
 		return value
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
-		return this.distribution.backward(execution, gradient)
+		const aVal = this.a.forward(execution)
+		const bVal = this.b.forward(execution)
+		const biggestSide = aVal === bVal ? null : (aVal > bVal ? this.a : this.b)
+		const aGradient = biggestSide !== this.b ? gradient : 0
+		const bGradient = biggestSide !== this.a ? gradient : 0
+		return this.a.backward(execution, aGradient) + this.b.backward(execution, bGradient)
+	}
+}
+
+export class Fulfillment extends Operation {
+	constructor(name, production, demand, demandToFulfill) {
+		super(name)
+		this.production = production
+		this.demand = demand
+		this.demandToFulfill = demandToFulfill
+	}
+
+	forward(execution) {
+		if (execution.values.has(this)) return execution.values.get(this)
+		let available = this.production.forward(execution)
+		for (const input of this.demand.inputs) {
+			const distributed = Math.min(input.forward(execution), available)
+			if (input === this.demandToFulfill) {
+				execution.values.set(this, distributed)
+				return distributed
+			}
+			available -= distributed
+		}
+	}
+
+	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
+		this.grade(execution, this, gradient)
+		const demanded = this.demandToFulfill.forward(execution)
+		const fulfilled = this.forward(execution)
+
+		if (fulfilled === demanded) {
+			this.demand.backward(execution, gradient)
+			// this.production.backward(execution, 0.00001)
+		} else {
+			this.production.backward(execution, gradient)
+			this.demandToFulfill.backward(execution, gradient)
+		}
 	}
 }
 
@@ -203,6 +275,7 @@ export class Multiply extends Operation {
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
 
 		const a = this.a.forward(execution)
@@ -224,12 +297,14 @@ export class Divide extends Operation {
 
 	forward(execution) {
 		if (execution.values.has(this)) return execution.values.get(this)
-		const value = this.a.forward(execution) / this.b.forward(execution)
+		let value = this.a.forward(execution) / this.b.forward(execution)
+		if (Number.isNaN(value)) value = 0
 		execution.values.set(this, value)
 		return value
 	}
 
 	backward(execution, gradient = 1) {
+		if (gradient == 0) return 0
 		this.grade(execution, this, gradient)
 
 		const a = this.a.forward(execution)
@@ -270,6 +345,10 @@ export function _optimize(operation, targetValue, variablesIn, costs, maxCost) {
 
 	const variablesOut = new Map(variablesIn)
 
+	const targetDiff = targetValue - execution.forward()
+	if (targetDiff === 0) return variablesIn
+	// const sortOrder = Math.sign(targetDiff);
+
 	const orderedVariableGradients = [...execution.gradients.entries()]
 	.filter(([op]) => op instanceof Variable)
 	.map(([op, gradient]) => {
@@ -281,23 +360,33 @@ export function _optimize(operation, targetValue, variablesIn, costs, maxCost) {
 	.sort(([, aGrade, aCost], [, bGrade, bCost]) => {
 		aGrade = aGrade / aCost
 		bGrade = bGrade / bCost
+		// return sortOrder === 1 ? bGrade - aGrade : aGrade - bGrade
 		return bGrade - aGrade
 	})
 
+	// debugger;
 	if (orderedVariableGradients.length === 0) {
 		return variablesOut
 	}
+	// console.log(orderedVariableGradients[0][0].name)
 
 	const [variable, gradient, cost] = orderedVariableGradients[0]
-	if (Math.sign(gradient) !== Math.sign(targetValue)) {
-		return variablesOut // if the gradient is in the wrong direction, we can't optimize this variable
+	// debugger;
+	// console.log(orderedVariableGradients, Math.sign(gradient), Math.sign(targetValue))
+
+	// if (Math.sign(gradient) !== Math.sign(targetDiff)) {
+		// return variablesOut // if the gradient is in the wrong direction, we can't optimize this variable
+	// }
+
+	const targetCost = Math.abs(targetDiff) * cost
+	const costRatio = Math.min(targetCost, maxCost) / targetCost
+	const affordedDiff = targetDiff * costRatio
+
+	if (Number.isNaN(affordedDiff)) {
+		debugger
 	}
-	const outDiff = targetValue - execution.forward()
 
-	const diffMax = maxCost / cost
-	const valueDiff = Math.min(outDiff / gradient, diffMax)
-
-	variablesOut.set(variable, variablesOut.get(variable) + valueDiff)
+	variablesOut.set(variable, variablesOut.get(variable) + affordedDiff)
 
 	return variablesOut
 }

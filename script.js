@@ -1,5 +1,4 @@
-import {execute, optimize, variables, industries, commodities, society} from './economy.js'
-import { Execution } from './imho.js'
+import {execute, optimize, variables, commodities, society, optimizeElectricDemand} from './economy.js'
 
 const g = document.getElementById.bind(document)
 const ce = document.createElement.bind(document)
@@ -17,11 +16,13 @@ const iconUrls = {
 	agri: 'assets/wheat-barley-svgrepo-com.svg',
 	coal: 'assets/coal-svgrepo-com.svg',
 	electric: 'assets/high-voltage-svgrepo-com.svg',
+	goods: 'assets/price-tag-price-svgrepo-com.svg',
 	grain: 'assets/wheat-barley-svgrepo-com.svg',
 	meat: 'assets/meat-on-bone-svgrepo-com.svg',
 	nuclear: 'assets/nuclear-power-plant-svgrepo-com.svg',
 	oil: 'assets/oil-drum-svgrepo-com.svg',
 	pop: 'assets/people-nearby-svgrepo-com.svg',
+	plastic: 'assets/plastic-bottle-2-svgrepo-com.svg',
 	solar: 'assets/solar-panels-solar-panel-svgrepo-com.svg',
 	water: 'assets/water-drops-svgrepo-com.svg',
 	waterrecycle: 'assets/recycle-svgrepo-com.svg',
@@ -32,8 +33,10 @@ const updates = [
 	// execute tasks
 	x => tasks.forEach(({ update }) => update?.(x)),
 
+	() => optimizeElectricDemand(),
+
 	// water recycling can only use water produced
-	() => variables.set(commodities.waterrecycle.availability, execute(industries.water.production)),
+	// () => variables.set(commodities.waterrecycle.availability, execute(industries.water.production)),
 ]
 
 /* AI */
@@ -76,6 +79,11 @@ const $usage_tasks = g('available_ai_tasks--usage');
 	['agri', 'usage', (x) => optimize(
 		industries.agri.demand, Infinity,
 		variables,
+		x / 1000 * 100
+	)],
+	['pop', 'usage', (x) => optimize(
+		society[0][1], 1_000_000,
+		new Map([[society[0][1], 1]]),
 		x / 1000 * 100
 	)],
 ].forEach(([name, where, update]) => {
@@ -134,31 +142,31 @@ function formatNumber(n, suffixes = ['', 'k', 'M', 'B', 'T']) {
 const usageFormatters = {
 	electric: x => `${formatNumber(x, [' watts', 'kw', 'mw'])}`,
 	water: x => `${formatNumber(x)} gallons`,
+	plastic: x => `${formatNumber(x)} tons`,
+	goods: x => `${formatNumber(x)} tons`,
 	agri: x => `${formatNumber(x)} tons`,
 }
-const $industries = g('industries')
-e(industries).forEach(([industry, {demand, potentialProductionNode, production}]) => {
+const $industries = g('industries');
+['electric', 'water', 'plastic', 'goods'].forEach(industry => {
+	industry = commodities[industry]
+	const { name, demand, production, demands, availableProduction } = industry
 	const $industryStatus = html(`
 <div class="industry-status">
-	<strong><img src="${iconUrls[industry]}" alt="${industry}" /> ${industry}</strong>
-	<meter min="0" low="0" high="0.8" max="1"></meter>
+	<strong><img src="${iconUrls[name]}" alt="${name}" /> ${name}</strong>
+	<meter min="0" low="0" high="0.9" max="1"></meter>
 	<span class="usage"></span>
 	<div class="inputs"></div>
 </div>`)
 	$industries.append($industryStatus)
 
-	potentialProductionNode.inputs.forEach(input => {
-		const name = input.name.match(/^[a-z]+/)
-		let displayName = name[0];
-		if (displayName === 'waterrecycle') {
-			displayName = 'recycle'
-		}
+	demands.forEach(( { from } ) => {
+		const name = from.name
 
 		$industryStatus.children[3].append(html(`
 			<div class="industry-item">
 				<img src="${iconUrls[name]}" alt="${name}" />
-				${displayName}
-				<meter min="0" low="0" high="0.8" max="1"></meter>
+				${name}
+				<meter min="0" max="1"></meter>
 			</div>
 		`))
 	})
@@ -167,17 +175,19 @@ e(industries).forEach(([industry, {demand, potentialProductionNode, production}]
 	const usage = $industryStatus.querySelector('.usage')
 
 	updates.push(() => {
-		meters[0].value = execute(demand) / execute(potentialProductionNode)
-		usage.innerHTML = usageFormatters[industry](Math.round(execute(production)))
+		const industyDemand = execute(demand)
 
-		const execution = new Execution(production, variables)
-		let demanded = demand.forward(execution)
+		meters[0].value = Math.min(industyDemand / execute(availableProduction), Number.MAX_VALUE)
+		usage.innerHTML = `${usageFormatters[name](Math.round(execute(production)))}
+		/
+		${usageFormatters[name](Math.round(industyDemand))}
+		/
+		${usageFormatters[name](Math.round(execute(availableProduction)))}`
 
-		potentialProductionNode.inputs.forEach((production, idx) => {
-			const available = production.forward(execution)
-			const consumedProduction = Math.min(available, demanded) / available
-			demanded -= available
-			meters[idx + 1].value = consumedProduction
+		demands.forEach(( { demandAmount, from, to, fulfillment }, idx ) => {
+			const fulfilled = execute(fulfillment)
+			// meters[idx + 1].value = fulfilled / industyDemand
+			meters[idx + 1].value = fulfilled / execute(production) || 0
 		})
 	})
 })

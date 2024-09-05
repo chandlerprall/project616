@@ -244,6 +244,7 @@ main {
 				.industry-item {
 					display: flex;
 					flex-direction: column;
+					justify-content: flex-end;
 					align-items: center;
 					width: 60px;
 					aspect-ratio: 1;
@@ -325,9 +326,8 @@ main {
 				width: 24px;
 			}
 
-			> meter {
-				margin: -5px 0 0;
-				width: 95%;
+			> span {
+				font-size: 0.7rem;
 			}
 		}
 	}
