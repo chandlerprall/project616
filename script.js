@@ -140,7 +140,7 @@ const $usage_tasks = g('available_ai_tasks--usage');
       [society[0][1], 1],
       [society.materialismVar, 1],
     ]),
-    x / 1000 * 100
+    x / 100_000
   )],
 ].forEach(([name, where, update]) => {
   const button = html(`<button><span class="resourceGroup"><img src="${iconUrls[name]}" />${name}</span></button>`);
@@ -246,9 +246,10 @@ const $industries = g('industries');
 		${usageFormatters[name](Math.round(execute(availableProduction)))}`
 
     demands.forEach(({ demandAmount, from, to, fulfillment }, idx) => {
-      const fulfilled = execute(fulfillment)
-      // meters[idx + 1].value = fulfilled / industyDemand
-      meters[idx + 1].value = fulfilled / execute(production) || 0
+      const fulfilled = execute(fulfillment[0] ?? fulfillment)
+      let value = fulfilled / execute(production) || 0;
+      if (!Number.isFinite(value)) value = 0
+      meters[idx + 1].value = value
     })
   })
 })

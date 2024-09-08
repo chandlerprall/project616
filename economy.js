@@ -11,7 +11,7 @@ import {
   Log1P,
   Divide,
   Fulfillment,
-  _optimize,
+  _optimize, CombinedSource,
 } from './imho.js'
 
 const Zero = new Constant('Zero', 0);
@@ -22,6 +22,9 @@ const GGP = new Add('GGP');
 export const co2ppm = new Variable('co2ppm')
 export const temperature = new Variable('temperature')
 const temperatureDeviation = new Subtract('temperatureDeviation', temperature, new Constant('temperatureBase', 1.2))
+
+export const health = new Variable('health')
+export const education = new Variable('education')
 
 const temperatureEffects = {
   grain: new Subtract('',
@@ -49,11 +52,7 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
 
   const demand = new Add(`${name}Demand`)
 
-  const _production = new Min(`${name}Production`, demand, potentialProduction)
-  let production = _production
-  if (temperatureEffects.hasOwnProperty(name)) {
-    // production
-  }
+  const production = new Min(`${name}Production`, demand, potentialProduction)
   // production.leaky = true
 
   const _availableProduction = new Multiply(`${name}_AvailableProduction`, inputAvailability, experiencedEfficiency)
@@ -106,8 +105,14 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
       const demandAmount = new Multiply(`${name}ModifiedDemandFrom${other.name}`, _demandAmount, maxedModifier)
       other.demand.include(demandAmount)
 
-      const unweightedProduction = new Divide(`${name}UnweightedProductionFrom${other.name}`, other.fulfill(demandAmount), weightConstant)
-      input.include(unweightedProduction)
+      const fulfilled = other.fulfill(demandAmount)
+      const unweightedProduction = new Divide(`${name}UnweightedProductionFrom${other.name}`, fulfilled, weightConstant)
+
+      if (input instanceof Add) {
+        input.include(unweightedProduction)
+      } else {
+        input.include([fulfilled, weight])
+      }
       inputAvailability.include(new Divide(`${name}InputAvailabilityFrom${other.name}`, other.availableProduction, weightConstant))
 
       demands.push({ demandAmount, from: other, to: this, fulfillment: unweightedProduction })
@@ -158,10 +163,11 @@ const agriDemandFromMeatModifier = agri.from(meat, 1)
 const plastic = commodity('plastic', 7)
 const plasticDemandFromOilModifier = plastic.from(oil, 1)
 
-const goods = commodity('goods', 100)
-const goodsDemandFromPlasticModifier = goods.from(plastic, 1)
-const goodsDemandFromElectricModifier = goods.from(electric, 1)
-const goodsDemandFromWaterModifier = goods.from(water, 1)
+const goodsInput = new CombinedSource('GoodsCombinedSource')
+const goods = commodity('goods', 100, goodsInput)
+const goodsDemandFromPlasticModifier = goods.from(plastic, 2)
+const goodsDemandFromElectricModifier = goods.from(electric, 20)
+const goodsDemandFromWaterModifier = goods.from(water, 5)
 
 const materialismVar = new Variable('materialsm')
 const materialNeed = new Constant('MaterialNeed', 0.2)
@@ -176,6 +182,29 @@ water.demand.include(new Multiply('', population, new Constant('', 0.16))) // 14
 agri.demand.include(new Multiply('', populationMaterialism, new Constant('', 0.43)))
 goods.demand.include(new Multiply('', populationMaterialism, new Constant('', 0.067)))
 
+window.test = () => {
+  // debugger
+  // const execution = new Execution(goods.production, variables)
+  // execution.backward()
+  // console.log([...execution.gradients].filter(([x]) => x instanceof Variable))
+  const modifiers = [
+    electricDemandFromWindModifier,
+    electricDemandFromSolarModifier,
+    electricDemandFromNuclearModifier,
+    electricDemandFromCoalModifier,
+    electricDemandFromOilModifier
+  ];
+  optimize(goods.production, Number.MAX_SAFE_INTEGER, new Map([
+    [population, 1],
+    [materialismVar, 1],
+    [oil.efficiency, 1],
+    [oil.input, 1],
+    [goodsDemandFromPlasticModifier, 1],
+    [plasticDemandFromOilModifier, 1],
+    ...modifiers.map((modifier) => [modifier, 1])
+  ]), 0.1)
+}
+
 const co2Increase = new Add(
   'co2increase',
   new Multiply('co2FromCoal', coal.production, new Constant('coalCo2', 1.043 / 1000)),
@@ -183,6 +212,9 @@ const co2Increase = new Add(
 )
 export const co2ppmIncrease = new Divide('co2ppmIncrease', co2Increase, new Constant('co2ToPpm', 30_000_000 * 365))
 export const temperatureIncrease = new Multiply('temperatureIncrease', co2ppmIncrease, new Constant('co2IncreaseToTemperature', 0.1 * 0.1))
+
+export const healthIncrease = new Multiply('healthIncrease', co2ppmIncrease, new Constant('co2IncreaseToTemperature', 0.1 * 0.1))
+export const educationIncrease = new Multiply('educationIncrease', co2ppmIncrease, new Constant('co2IncreaseToTemperature', 0.1 * 0.1))
 
 export const allModifiers = {
   electricDemandFromWindModifier,
@@ -216,6 +248,9 @@ export let variables = new Map([
   [materialismVar, 0.5],
   [co2ppm, 421],
   [temperature, 1.3],
+
+  [health, 0.7],
+  [education, 0.6],
 
   [wind.input, 65_000_000_000],
   [wind.efficiency, 1],
@@ -292,29 +327,28 @@ export function optimizeElectricDemand() {
       optimize(electric.potentialProduction, target, costs, 0.1)
     } else {
       modifiers.forEach(modifier => {
-        variables.set(modifier, variables.get(modifier) * 0.99)
+        variables.set(modifier, variables.get(modifier) * 0.9)
       })
-      optimize(electric.potentialProduction, target * 1, costs, 0.1)
+      optimize(electric.potentialProduction, target, costs, 0.1)
     }
-    optimize(electric.potentialProduction, target, costs, 0.1)
   }
 
   // console.log(modifiers.map((modifier) => variables.get(modifier)))
   // console.log('now', execute(electric.input))
 
   // for (let i = 0; i < 20; i++) {
-  optimize(electric._availableProduction, target * 1.2, new Map([
-    [coal.efficiency, 1],
-    [coal.input, () => execute(commodities.coal.cost)],
-    [wind.efficiency, 1],
-    [wind.input, () => execute(commodities.wind.cost)],
-    [solar.efficiency, 1],
-    [solar.input, () => execute(commodities.solar.cost)],
-    [nuclear.efficiency, 1],
-    [nuclear.input, () => execute(commodities.nuclear.cost)],
-    [oil.efficiency, 1],
-    [oil.input, () => execute(commodities.oil.cost)],
-  ]), 0.01)
+  // optimize(electric._availableProduction, target * 1, new Map([
+  //   [coal.efficiency, 1],
+  //   [coal.input, () => execute(commodities.coal.cost)],
+  //   [wind.efficiency, 1],
+  //   [wind.input, () => execute(commodities.wind.cost)],
+  //   [solar.efficiency, 1],
+  //   [solar.input, () => execute(commodities.solar.cost)],
+  //   [nuclear.efficiency, 1],
+  //   [nuclear.input, () => execute(commodities.nuclear.cost)],
+  //   [oil.efficiency, 1],
+  //   [oil.input, () => execute(commodities.oil.cost)],
+  // ]), 0.01)
   // }
 
   if (execute(plastic._availableProduction) < execute(plastic.demand) * 1.2) {

@@ -148,6 +148,55 @@ export class Add extends Operation {
   }
 }
 
+const Zero = new Constant('Zero', 0);
+const One = new Constant('One', 1);
+
+export class CombinedSource extends Operation {
+  constructor(name, sources = []) {
+    super(name)
+    this.sources = sources;
+  }
+
+  forward(execution) {
+    if (execution.values.has(this)) return execution.values.get(this)
+    let value = Infinity
+
+    for (const [source, weight] of this.sources) {
+      const myValue = source.forward(execution) / weight;
+      value = Math.min(value, myValue)
+    }
+
+    if (value === Infinity) value = 0
+    execution.values.set(this, value)
+    return value
+  }
+
+  backward(execution, gradient = 1) {
+    if (gradient == 0) return 0
+    let result = 0;
+
+    let maxValue = 0
+
+    for (const [source, weight] of this.sources) {
+      const myValue = source.forward(execution) / weight;
+      maxValue = Math.max(maxValue, myValue)
+    }
+
+    for (const [source, weight] of this.sources) {
+      const myValue = source.forward(execution) / weight;
+      if (myValue < maxValue) {
+        result += source.backward(execution, gradient)
+      }
+    }
+
+    return result
+  }
+
+  include(...sources) {
+    this.sources.push(...sources)
+  }
+}
+
 export class Subtract extends Operation {
   constructor(name, a, b) {
     super(name)
