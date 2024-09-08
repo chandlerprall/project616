@@ -7,10 +7,11 @@ import {
   Min,
   Max,
   Variable,
+  Power,
   Log1P,
   Divide,
   Fulfillment,
-  _optimize
+  _optimize,
 } from './imho.js'
 
 const Zero = new Constant('Zero', 0);
@@ -18,26 +19,52 @@ const One = new Constant('One', 1);
 
 const GGP = new Add('GGP');
 
+export const co2ppm = new Variable('co2ppm')
+export const temperature = new Variable('temperature')
+const temperatureDeviation = new Subtract('temperatureDeviation', temperature, new Constant('temperatureBase', 1.2))
+
+const temperatureEffects = {
+  grain: new Subtract('',
+    One,
+    new Power(`temperatureDeviationEffectOnGrain`,
+      temperatureDeviation,
+      new Constant('temperatureDeviationEffectOnGrainPower', 0.99)
+    )
+  )
+}
+
 export const commodities = {}
 function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailability = new Add(`${name}InputAvailability`)) {
   const efficiency = new Variable(`${name}Efficiency`)
-  const potentialProduction = new Multiply(`${name}PotentialProduction`, input, efficiency)
+
+  let efficiencyModifier = new Add('', One, Zero)
+  let demandModifier = new Add('', One, Zero)
+  if (temperatureEffects.hasOwnProperty(name)) {
+    efficiencyModifier = temperatureEffects[name]
+    demandModifier = new Divide('', One, efficiencyModifier)
+  }
+  const experiencedEfficiency = new Multiply(`${name}Efficiency`, efficiency, efficiencyModifier)
+
+  const potentialProduction = new Multiply(`${name}PotentialProduction`, input, experiencedEfficiency)
 
   const demand = new Add(`${name}Demand`)
-  const production = new Min(`${name}Production`, demand, potentialProduction)
+
+  const _production = new Min(`${name}Production`, demand, potentialProduction)
+  let production = _production
+  if (temperatureEffects.hasOwnProperty(name)) {
+    // production
+  }
   // production.leaky = true
 
-  const _availableProduction = new Multiply(`${name}_AvailableProduction`, inputAvailability, efficiency)
-  // const availableProduction = new Subtract(`${name}AvailableProduction`, _availableProduction, production)
+  const _availableProduction = new Multiply(`${name}_AvailableProduction`, inputAvailability, experiencedEfficiency)
   const availableProduction = _availableProduction;
-  const thing = new Subtract(`${name}AvailableProduction`, _availableProduction, production)
 
   const demandMet = new Divide(`${name}DemandMet`, production, demand)
 
   const demands = []
 
   const cost = new Divide('',
-    new Constant('', baseCost * 0.53),
+    new Constant('', baseCost * 0.56),
     new Log1P('', new Divide('', demand, new Max('', _availableProduction, Zero))),
   )
   const ggp = new Multiply(`${name}GGP`, production, cost)
@@ -59,6 +86,9 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
     demand,
     demandMet,
 
+    efficiencyModifier,
+    demandModifier,
+
     demands,
 
     cost,
@@ -71,7 +101,8 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
         One
       )
       const weightConstant = new Constant(`_${name}WeightFrom${other.name}`, weight)
-      const _demandAmount = new Multiply(`${name}WeightedDemandFrom${other.name}`, demand, weightConstant)
+      const weightedDemand = new Multiply(`${name}WeightedDemandFrom${other.name}`, demand, weightConstant)
+      const _demandAmount = new Multiply(`${name}WeightedDemandFrom${other.name}`, weightedDemand, demandModifier)
       const demandAmount = new Multiply(`${name}ModifiedDemandFrom${other.name}`, _demandAmount, maxedModifier)
       other.demand.include(demandAmount)
 
@@ -90,8 +121,6 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
     }
   }
 }
-
-const co2ppm = new Variable('co2ppm')
 
 const windAvailabilityVar = new Variable('WindAvailability')
 const solarAvailabilityVar = new Variable('SolarAvailability')
@@ -147,13 +176,13 @@ water.demand.include(new Multiply('', population, new Constant('', 0.16))) // 14
 agri.demand.include(new Multiply('', populationMaterialism, new Constant('', 0.43)))
 goods.demand.include(new Multiply('', populationMaterialism, new Constant('', 0.067)))
 
-// in grams
 const co2Increase = new Add(
   'co2increase',
-  new Multiply('co2FromCoal', coal.production, new Constant('coalCo2', 1043)),
-  new Multiply('co2FromOil', coal.production, new Constant('coalCo2', 1080)),
+  new Multiply('co2FromCoal', coal.production, new Constant('coalCo2', 1.043 / 1000)),
+  new Multiply('co2FromOil', oil.production, new Constant('oilCo2', 1.08 / 1000)),
 )
-// 1ppm = 2.13 Gt
+export const co2ppmIncrease = new Divide('co2ppmIncrease', co2Increase, new Constant('co2ToPpm', 30_000_000 * 365))
+export const temperatureIncrease = new Multiply('temperatureIncrease', co2ppmIncrease, new Constant('co2IncreaseToTemperature', 0.1 * 0.1))
 
 export const allModifiers = {
   electricDemandFromWindModifier,
@@ -177,6 +206,8 @@ export const society = [
   ['pop', population],
   ['ggp', GGP],
   ['materialism', materialism],
+  ['co2ppm', co2ppm],
+  ['temperature', temperature],
 ]
 society.materialismVar = materialismVar
 
@@ -184,6 +215,7 @@ export let variables = new Map([
   [population, 8_174_511_828],
   [materialismVar, 0.5],
   [co2ppm, 421],
+  [temperature, 1.3],
 
   [wind.input, 65_000_000_000],
   [wind.efficiency, 1],

@@ -302,11 +302,14 @@ main {
 		display: flex;
 		flex-grow: 1;
 		flex-direction: column;
+		flex-wrap: wrap;
+		align-content: flex-start;
 		padding: 10px;
 		padding-bottom: 5px;
 		border-radius: 5px;
 		margin-left: 5px;
 		gap: 5px;
+		height: 180px;
 
 		.society-item {
 			display: flex;

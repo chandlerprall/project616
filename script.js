@@ -1,4 +1,15 @@
-import { execute, optimize, variables, commodities, society, optimizeElectricDemand } from './economy.js'
+import {
+  execute,
+  optimize,
+  variables,
+  commodities,
+  society,
+  optimizeElectricDemand,
+  co2ppm,
+  co2ppmIncrease,
+  temperature,
+  temperatureIncrease,
+} from './economy.js'
 
 const g = document.getElementById.bind(document)
 const ce = document.createElement.bind(document)
@@ -30,6 +41,15 @@ const iconUrls = {
 }
 
 const updates = [
+  // update variables
+  () => {
+    const co2increase = execute(co2ppmIncrease)
+    variables.set(co2ppm, variables.get(co2ppm) + co2increase)
+
+    const tempincrease = execute(temperatureIncrease)
+    variables.set(temperature, variables.get(temperature) + tempincrease)
+  },
+
   // execute tasks
   x => tasks.forEach(({ update }) => update?.(x)),
 
@@ -183,7 +203,9 @@ const usageFormatters = {
   agri: x => `${formatNumber(x)} tons`,
   pop: x => `${formatNumber(x)}`,
   ggp: x => `$${formatNumber(x)}`,
-  materialism: x => `${x.toPrecision(2)}`,
+  materialism: x => `${x.toFixed(2)}`,
+  co2ppm: x => `${x.toFixed(2)}`,
+  temperature: x => `${x.toFixed(1)}`,
 }
 const $industries = g('industries');
 ['electric', 'water', 'agri', 'plastic', 'goods'].forEach(industry => {
