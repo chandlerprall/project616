@@ -5,6 +5,7 @@ import {
   commodities,
   society,
   optimizeElectricDemand,
+  optimizeAgriDemand,
   co2ppm,
   co2ppmIncrease,
   temperature,
@@ -53,6 +54,7 @@ const updates = [
   // execute tasks
   x => tasks.forEach(({ update }) => update?.(x)),
 
+  () => optimizeAgriDemand(),
   () => optimizeElectricDemand(),
 
   // water recycling can only use water produced

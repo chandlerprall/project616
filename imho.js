@@ -116,6 +116,33 @@ export class Log1P extends Operation {
   }
 }
 
+export class Absolute extends Operation {
+  constructor(name, value) {
+    super(name)
+    this.value = value
+  }
+
+  forward(execution) {
+    if (execution.values.has(this)) return execution.values.get(this)
+    const value = Math.abs(this.value.forward(execution))
+    execution.values.set(this, value)
+    return value
+  }
+
+  backward(execution, gradient = 1) {
+    if (gradient == 0) return 0
+    if (Number.isNaN(gradient)) debugger
+    this.grade(execution, this, gradient)
+    const value = this.value.forward(execution)
+    const result = this.forward(execution)
+    return this.value.backward(execution, Math.sign(value) === Math.sign(result) ? gradient : -gradient)
+  }
+
+  include(...inputs) {
+    this.inputs.push(...inputs)
+  }
+}
+
 export class Add extends Operation {
   constructor(name, ...inputs) {
     super(name)
@@ -147,9 +174,6 @@ export class Add extends Operation {
     this.inputs.push(...inputs)
   }
 }
-
-const Zero = new Constant('Zero', 0);
-const One = new Constant('One', 1);
 
 export class CombinedSource extends Operation {
   constructor(name, sources = []) {
