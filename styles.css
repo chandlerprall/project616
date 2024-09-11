@@ -337,8 +337,12 @@ main {
 }
 
 /* components */
-
 #available_ai_tasks {
+	#clear-ai-task {
+		display: none;
+		margin: 10px auto 0;
+	}
+
 	&:popover-open {
 		padding: 0;
 
@@ -389,6 +393,10 @@ main {
 }
 
 data {
+	display: flex;
+	justify-content: space-around;
+	align-items: center;
+	min-width: 100px;
 	width: fit-content;
 	padding: 2px;
 	font-size: 0.8rem;
@@ -397,4 +405,8 @@ data {
 	background: rgb(0, 0, 0);
 	color: rgb(34, 189, 73);
 	border-radius: 5px;
+
+	img {
+		width: 12px;
+	}
 }

@@ -24,8 +24,8 @@
 			<h1>AI</h1>
 			<div id="ai-status">
 				<div id="ai-tasks"></div>
-				<data>[🔋 usage / $$$ cost]</data>
-				<data>[💧 usage / $$$ cost]</data>
+				<data><img src="assets/high-voltage-svgrepo-com.svg" /><span id="ai-electric-usage"></span></data>
+				<data><img src="assets/water-drops-svgrepo-com.svg" /><span id="ai-water-usage"></span></data>
 			</div>
 		</section>
 		<section id="industry">
@@ -38,8 +38,11 @@
 		</section>
 	</div>
 </main>
+<div id="test">Testing</div>
 <dialog id="available_ai_tasks" popover>
 	<h6>assign task</h6>
+
+	<button id="clear-ai-task">clear task</button>
 
 	<div id="available_ai_tasks--optimize">
 		<h5>optimize</h5>

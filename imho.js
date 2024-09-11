@@ -12,6 +12,8 @@ export class Operation {
   }
 
   grade(execution, operation, gradient) {
+    if (gradient === Infinity) debugger
+    if (Number.isNaN(gradient)) return
     if (operation instanceof Constant || operation.name == null) return
     if (!execution.gradients.has(operation)) {
       execution.gradients.set(operation, gradient)
@@ -78,7 +80,9 @@ export class Power extends Operation {
     const x = this.a.forward(execution)
     const n = this.b.forward(execution)
 
-    const a = n * Math.pow(x, n - 1) * gradient
+    let a = n * Math.pow(x, n - 1) * gradient
+    if (a === Infinity) a = gradient
+    if (a === -Infinity) a = -gradient
     const b = Math.pow(x, n) * Math.log(x) * gradient
 
     this.a.backward(execution, a)
@@ -116,6 +120,33 @@ export class Log1P extends Operation {
   }
 }
 
+export class Absolute extends Operation {
+  constructor(name, value) {
+    super(name)
+    this.value = value
+  }
+
+  forward(execution) {
+    if (execution.values.has(this)) return execution.values.get(this)
+    const value = Math.abs(this.value.forward(execution))
+    execution.values.set(this, value)
+    return value
+  }
+
+  backward(execution, gradient = 1) {
+    if (gradient == 0) return 0
+    if (Number.isNaN(gradient)) debugger
+    this.grade(execution, this, gradient)
+    const value = this.value.forward(execution)
+    const result = this.forward(execution)
+    return this.value.backward(execution, Math.sign(value) === Math.sign(result) ? gradient : -gradient)
+  }
+
+  include(...inputs) {
+    this.inputs.push(...inputs)
+  }
+}
+
 export class Add extends Operation {
   constructor(name, ...inputs) {
     super(name)
@@ -147,9 +178,6 @@ export class Add extends Operation {
     this.inputs.push(...inputs)
   }
 }
-
-const Zero = new Constant('Zero', 0);
-const One = new Constant('One', 1);
 
 export class CombinedSource extends Operation {
   constructor(name, sources = []) {
@@ -404,7 +432,7 @@ export function _optimize(operation, targetValue, variablesIn, costs, maxCost) {
 
   const variablesOut = new Map(variablesIn)
 
-  const targetDiff = targetValue - execution.forward()
+  let targetDiff = targetValue - execution.forward()
   if (targetDiff === 0) return variablesIn
   // const sortOrder = Math.sign(targetDiff);
 
@@ -420,7 +448,7 @@ export function _optimize(operation, targetValue, variablesIn, costs, maxCost) {
       aGrade = aGrade / aCost
       bGrade = bGrade / bCost
       // return sortOrder === 1 ? bGrade - aGrade : aGrade - bGrade
-      return bGrade - aGrade
+      return Math.abs(bGrade) - Math.abs(aGrade)
     })
 
   // debugger;
@@ -433,13 +461,13 @@ export function _optimize(operation, targetValue, variablesIn, costs, maxCost) {
   // debugger;
   // console.log(orderedVariableGradients, Math.sign(gradient), Math.sign(targetValue))
 
-  // if (Math.sign(gradient) !== Math.sign(targetDiff)) {
-  // return variablesOut // if the gradient is in the wrong direction, we can't optimize this variable
-  // }
+  if (Math.sign(gradient) !== Math.sign(targetDiff)) {
+    targetDiff *= -1
+  }
 
   const targetCost = Math.abs(targetDiff) * cost
   const costRatio = (Math.min(targetCost, maxCost) / targetCost) || 0
-  const affordedDiff = targetDiff * costRatio
+  const affordedDiff = targetDiff * costRatio * Math.sign(targetDiff)
 
   if (Number.isNaN(targetCost)) debugger
   if (Number.isNaN(costRatio)) {

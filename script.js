@@ -5,10 +5,11 @@ import {
   commodities,
   society,
   optimizeElectricDemand,
+  optimizeAgriDemand,
   co2ppm,
   co2ppmIncrease,
   temperature,
-  temperatureIncrease,
+  temperatureIncrease, electricDemandFromAI, waterDemandFromAI, activeAiTasks, populationChange, population,
 } from './economy.js'
 
 const g = document.getElementById.bind(document)
@@ -43,16 +44,28 @@ const iconUrls = {
 const updates = [
   // update variables
   () => {
+    variables.set(activeAiTasks, tasks.filter(x => !!x.update).length)
+
     const co2increase = execute(co2ppmIncrease)
     variables.set(co2ppm, variables.get(co2ppm) + co2increase)
 
     const tempincrease = execute(temperatureIncrease)
     variables.set(temperature, variables.get(temperature) + tempincrease)
+
+    const populationincrease = execute(populationChange)
+    variables.set(population, Math.max(0, variables.get(population) + populationincrease))
+  },
+
+  // update UI
+  () => {
+    $aiElectricUsage.textContent = `${usageFormatters.electric(execute(electricDemandFromAI).toPrecision(1))}`
+    $aiWaterUsage.textContent = `${usageFormatters.water(execute(waterDemandFromAI).toPrecision(1))}`
   },
 
   // execute tasks
   x => tasks.forEach(({ update }) => update?.(x)),
 
+  () => optimizeAgriDemand(),
   () => optimizeElectricDemand(),
 
   // water recycling can only use water produced
@@ -109,11 +122,18 @@ const $usage_tasks = g('available_ai_tasks--usage');
     variables,
     x / 1000 * 100
   )],
-  ['pop', 'usage', (x) => optimize(
-    society[0][1], Number.MAX_VALUE,
-    new Map([[society[0][1], 1]]),
-    x / 1000 * 1_000_000 * 100
-  )],
+  // ['pop', 'usage', (x) => optimize(
+  //   society[0][1], Number.MAX_VALUE,
+  //   new Map([[society[0][1], 1]]),
+  //   x / 1000 * 1_000_000 * 100
+  // )],
+  ['pop', 'usage', (x) => {
+    optimize(
+      society[1][1], -1_000_000,
+      variables,
+      x / 100_000
+    )
+  }],
   ['ggp', 'usage', (x) => optimize(
     society[1][1], Number.MAX_VALUE,
     new Map([
@@ -153,6 +173,14 @@ const $usage_tasks = g('available_ai_tasks--usage');
   if (where === 'usage') $usage_tasks.children[1].append(button)
 })
 
+const $aiElectricUsage = g('ai-electric-usage')
+const $aiWaterUsage = g('ai-water-usage')
+const $clearAiTask = g('clear-ai-task')
+$clearAiTask.onclick = () => {
+  assignTask(null, null)
+  $available_tasks.togglePopover()
+}
+
 let assigning_task_to
 const tasks = (() => {
   const $aitasks = g('ai-tasks')
@@ -160,7 +188,10 @@ const tasks = (() => {
     $aitasks.innerHTML = ''
     $aitasks.append(...tasks.map((x, idx) => {
       const element = ce('button')
-      element.onclick = () => assigning_task_to = idx
+      element.onclick = () => {
+        assigning_task_to = idx
+        $clearAiTask.style.display = tasks[idx].update ? 'block' : 'none'
+      }
       element.classList.add('ai-task')
       element.setAttribute('popovertarget', 'available_ai_tasks')
       element.append(x.slot)
@@ -190,8 +221,8 @@ tasks.push({ slot: ce('div') })
 tasks.push({ slot: ce('div') })
 
 /* Industry */
-function formatNumber(n, suffixes = ['', 'k', 'M', 'B', 'T']) {
-  if (n < 1000) return n.toString();
+function formatNumber(n, suffixes = ['', 'k', 'M', 'B', 'T', 'Q']) {
+  if (n < 1000) return `${n.toString()}${suffixes[0]}`;
   const i = Math.floor(Math.log10(n) / 3);
   return `${(n / Math.pow(1000, i)).toFixed(1)}${suffixes[i]}`;
 }
@@ -202,13 +233,17 @@ const usageFormatters = {
   goods: x => `${formatNumber(x)} tons`,
   agri: x => `${formatNumber(x)} tons`,
   pop: x => `${formatNumber(x)}`,
+  'pop-': x => `${formatNumber(x)}`,
   ggp: x => `$${formatNumber(x)}`,
   materialism: x => `${x.toFixed(2)}`,
   co2ppm: x => `${x.toFixed(2)}`,
   temperature: x => `${x.toFixed(1)}`,
+  health: x => `${x.toFixed(2)}`,
+  healthIndustry: x => `${formatNumber(x)} souls`,
+  approval: x => `${x.toFixed(2)}`,
 }
 const $industries = g('industries');
-['electric', 'water', 'agri', 'plastic', 'goods'].forEach(industry => {
+['electric', 'water', 'agri', 'plastic', 'goods', 'healthIndustry'].forEach(industry => {
   industry = commodities[industry]
   const { name, demand, demandMet, production, demands, availableProduction, _availableProduction } = industry
   const $industryStatus = html(`
