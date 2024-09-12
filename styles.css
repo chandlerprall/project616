@@ -113,18 +113,29 @@ main {
 	}
 }
 
-#ai-status {
-	display: flex;
-	flex-grow: 1;
-	flex-direction: column;
-	justify-content: space-between;
-	gap: 5px;
-	padding: 10px;
+.aiSection {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
 	padding-bottom: 5px;
 	background: rgb(184, 147, 138);
 	box-shadow: inset 3px 3px 3px -1px rgb(82, 18, 6);
 	border-radius: 5px;
-	margin-left: 5px;
+  margin-left: 5px;
+}
+
+#ai-status {
+	flex-grow: 1;
+	justify-content: space-between;
+	gap: 5px;
+}
+
+#ai-research {
+	flex-grow: 0;
+	justify-content: flex-start;
+}
+#current-research {
+  font-size: 0.8rem;
 }
 
 #ai-tasks {

@@ -10,6 +10,7 @@ import {
   co2ppmIncrease,
   temperature,
   temperatureIncrease, electricDemandFromAI, waterDemandFromAI, activeAiTasks, populationChange, population,
+  aiResearch,
 } from './economy.js'
 
 const g = document.getElementById.bind(document)
@@ -73,6 +74,17 @@ const updates = [
 ]
 
 /* AI */
+let currentResearch;
+const $aiAvailableResearch = g('ai-available-research')
+
+  ;['AI Power', 'Oil', 'Coal'].forEach(x => {
+    const btn = html(`<li><button>${x}</button></li>`)
+    btn.onclick = () => {
+      variables.set(aiResearch, 1)
+    }
+    $aiAvailableResearch.append(btn)
+  })
+
 function assignTask(node, update) {
   const task = tasks[assigning_task_to]
   task.slot.innerHTML = ''
@@ -113,9 +125,11 @@ const $usage_tasks = g('available_ai_tasks--usage');
     x / 1000 * 100
   )],
   ['water', 'usage', (x) => optimize(
-    commodities.water.demand, Number.MAX_SAFE_INTEGER,
-    variables,
-    x / 1000 * 100
+    commodities.water.availableProduction, Number.MAX_SAFE_INTEGER,
+    new Map([
+      [commodities.water.synthesizingAbility, 1]
+    ]),
+    x / 1000 * 100 * 1_000_000
   )],
   ['agri', 'usage', (x) => optimize(
     commodities.agri.demand, Number.MAX_SAFE_INTEGER,
@@ -239,13 +253,13 @@ const usageFormatters = {
   co2ppm: x => `${x.toFixed(2)}`,
   temperature: x => `${x.toFixed(1)}`,
   health: x => `${x.toFixed(2)}`,
-  healthIndustry: x => `${formatNumber(x)} souls`,
   approval: x => `${x.toFixed(2)}`,
+  ai: x => `${(x / 100).toFixed(2)}`,
 }
 const $industries = g('industries');
-['electric', 'water', 'agri', 'plastic', 'goods', 'healthIndustry'].forEach(industry => {
+['electric', 'water', 'agri', 'plastic', 'goods'].forEach(industry => {
   industry = commodities[industry]
-  const { name, demand, demandMet, production, demands, availableProduction, _availableProduction } = industry
+  const { name, demand, demandMet, production, demands, availableProduction } = industry
   const $industryStatus = html(`
 <div class="industry-status">
 	<strong><img src="${iconUrls[name]}" alt="${name}" /> ${name}</strong>

@@ -35,8 +35,11 @@ const temperatureEffects = {
 }
 
 export const commodities = {}
-function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailability = new Add(`${name}InputAvailability`)) {
+function commodity(name, baseCost) {
   const efficiency = new Variable(`${name}Efficiency`)
+  const synthesizingAbility = new Variable(`${name}SynthesizingAbility`)
+  let input = synthesizingAbility
+  let inputAvailability = synthesizingAbility
 
   let efficiencyModifier = new Add('', One, Zero)
   let demandModifier = new Add('', One, Zero)
@@ -46,15 +49,16 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
   }
   const experiencedEfficiency = new Multiply(`${name}Efficiency`, efficiency, efficiencyModifier)
 
-  const potentialProduction = new Multiply(`${name}PotentialProduction`, input, experiencedEfficiency)
+  const actualInput = new Min(`${name}ActualInput`, synthesizingAbility, input)
+  const potentialProduction = new Multiply(`${name}PotentialProduction`, actualInput, experiencedEfficiency)
 
   const demand = new Add(`${name}Demand`)
 
   const production = new Min(`${name}Production`, demand, potentialProduction)
   production.leaky = true
 
-  const _availableProduction = new Multiply(`${name}_AvailableProduction`, inputAvailability, experiencedEfficiency)
-  const availableProduction = _availableProduction;
+  const actualAvailability = new Min(`${name}ActualAvailability`, synthesizingAbility, inputAvailability)
+  const availableProduction = new Multiply(`${name}AvailableProduction`, actualAvailability, experiencedEfficiency)
 
   const demandMet = new Divide(`${name}DemandMet`, production, demand)
 
@@ -62,14 +66,18 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
 
   const cost = new Divide('',
     new Constant('', baseCost * 0.56),
-    new Log1P('', new Divide('', demand, new Max('', _availableProduction, Zero))),
+    new Log1P('', new Divide('', demand, new Max('', availableProduction, Zero))),
   )
   const ggp = new Multiply(`${name}GGP`, production, cost)
 
   GGP.include(ggp)
 
+  let converted = false
+
   return commodities[name] = {
     name,
+
+    synthesizingAbility,
 
     input,
     efficiency,
@@ -78,7 +86,6 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
 
     inputAvailability,
     availableProduction,
-    _availableProduction,
 
     demand,
     demandMet,
@@ -92,6 +99,19 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
     ggp,
 
     from(other, weight) {
+      if (!converted) {
+        input = new Add(`${name}Input`)
+        actualInput.b = input
+
+        inputAvailability = new Add(`${name}InputAvailability`)
+        actualAvailability.b = inputAvailability
+
+        commodities[name].input = input
+        commodities[name].inputAvailability = inputAvailability
+
+        converted = true
+      }
+
       const modifier = new Variable(`${name}DemandFrom${other.name}Modifier`)
       const maxedModifier = new Min(`${name}MaxedDemandFrom${other.name}Modifier`,
         new Max('', modifier, Zero),
@@ -125,21 +145,22 @@ function commodity(name, baseCost, input = new Add(`${name}Input`), inputAvailab
   }
 }
 
-const windAvailabilityVar = new Variable('WindAvailability')
-const solarAvailabilityVar = new Variable('SolarAvailability')
-const nuclearAvailabilityVar = new Variable('NuclearAvailability')
-const coalAvailabilityVar = new Variable('CoalAvailability')
-const oilAvailabilityVar = new Variable('OilAvailability')
+// const windAvailabilityVar = new Variable('WindAvailability')
+// const solarAvailabilityVar = new Variable('SolarAvailability')
+// const nuclearAvailabilityVar = new Variable('NuclearAvailability')
+// const coalAvailabilityVar = new Variable('CoalAvailability')
+// const oilAvailabilityVar = new Variable('OilAvailability')
 
 export const activeAiTasks = new Variable('activeAiTasks')
+export const aiResearch = new Variable('aiResearch')
 export const aiification = new Variable('aiification')
 const aiPower = new Power('aiPower', aiification, new Constant('', 5))
 
-const wind = commodity('wind', 2, windAvailabilityVar, windAvailabilityVar)
-const solar = commodity('solar', 1, solarAvailabilityVar, solarAvailabilityVar)
-const nuclear = commodity('nuclear', 1.5, nuclearAvailabilityVar, nuclearAvailabilityVar)
-const coal = commodity('coal', 5, coalAvailabilityVar, coalAvailabilityVar)
-const oil = commodity('oil', 15, oilAvailabilityVar, oilAvailabilityVar)
+const wind = commodity('wind', 2)
+const solar = commodity('solar', 1)
+const nuclear = commodity('nuclear', 1.5)
+const coal = commodity('coal', 5)
+const oil = commodity('oil', 15)
 
 const electric = commodity('electric', 3)
 const electricDemandFromWindModifier = electric.from(wind, 1)
@@ -147,13 +168,21 @@ const electricDemandFromSolarModifier = electric.from(solar, 1)
 const electricDemandFromNuclearModifier = electric.from(nuclear, 1)
 const electricDemandFromCoalModifier = electric.from(coal, 1)
 const electricDemandFromOilModifier = electric.from(oil, 1)
-export const electricDemandFromAI = new Multiply('ElectricDemandFromAI', new Multiply('', activeAiTasks, aiPower), new Constant('', 1_000_000))
+export const electricDemandFromAI = new Add(
+  'ElectricDemandFromAI',
+  new Multiply('ElectricDemandFromAITasks', new Multiply('', activeAiTasks, aiPower), new Constant('', 1_000_000)),
+  new Multiply('ElectricDemandFromAiResearch', aiResearch, new Constant('', 5_000_000))
+)
 const globalDemandFromAI = new Multiply('GlobalElectricDemandFromAI', aiPower, new Constant('', 1_000_000))
 electric.demand.include(electricDemandFromAI, globalDemandFromAI)
 
 const water = commodity('water', 5)
 const waterDemandFromElectricModifier = water.from(electric, 0.5)
-export const waterDemandFromAI = new Multiply('WaterDemandFromAI', new Multiply('', activeAiTasks, aiPower), new Constant('', 1_000))
+export const waterDemandFromAI = new Add(
+  'WaterDemandFromAI',
+  new Multiply('WaterDemandFromAITasks', new Multiply('', activeAiTasks, aiPower), new Constant('', 1_000)),
+  new Multiply('WaterDemandFromAiResearch', aiResearch, new Constant('', 5_000))
+)
 const globalWaterDemandFromAI = new Multiply('GlobalWaterDemandFromAI', aiPower, new Constant('', 1_000))
 water.demand.include(waterDemandFromAI, globalWaterDemandFromAI)
 
@@ -206,23 +235,24 @@ const healthDetractionFromAgriRatio = new Power('healthDetractionFromAgri', meat
 const healthDetractionFromHunger = new Power('healthDetractionFromHunger', new Subtract('', One, commodities.agri.demandMet), new Constant('healthDetractionFromHungerPower', 0.5))
 const healthDetractionFromThirst = new Power('healthDetractionFromThirst', new Subtract('', One, commodities.water.demandMet), new Constant('healthDetractionFromThirstPower', 0.5))
 const healthDetractionFromMaterialism = new Power('healthDetractionFromMaterialism', materialism, new Constant('healthDetractionFromMaterialismPower', 3))
+const healthDetractionFromElectric = new Power('healthDetractionFromElectric', new Subtract('', One, commodities.electric.demandMet), new Constant('', 1))
 const health = new Max('', Zero,
   new Subtract('health', One,
-    new Add('healthDetractions', healthDetractionFromAgriRatio, healthDetractionFromHunger, healthDetractionFromThirst, healthDetractionFromMaterialism)
+    new Add('healthDetractions', healthDetractionFromAgriRatio, healthDetractionFromHunger, healthDetractionFromThirst, healthDetractionFromMaterialism, healthDetractionFromElectric)
   )
 )
 
-const healthIndustryAvailabilityVar = new Variable('HealthIndustryAvailability')
-const healthIndustry = commodity('healthIndustry', 1_000, healthIndustryAvailabilityVar, healthIndustryAvailabilityVar)
+const healthIndustry = commodity('healthIndustry', 1_000)
 const healthIndustryDemandFromHealth = new Power('', new Constant('', 0.1), health)
 healthIndustry.demand.include(new Multiply('', population, healthIndustryDemandFromHealth))
 
 const approvalDetractionFromHealth = new Power('', health, new Constant('', 1.5))
 const approvalDetractionFromFood = new Power('', new Subtract('', One, commodities.agri.demandMet), new Constant('', 1.5))
-const approvalDetractionFromWater = new Power('', new Subtract('', One, commodities.agri.demandMet), new Constant('', 1.5))
+const approvalDetractionFromWater = new Power('', new Subtract('', One, commodities.water.demandMet), new Constant('', 1.5))
 const approvalDetractionFromGoods = new Power('', new Subtract('', One, commodities.goods.demandMet), new Constant('', 1.5))
+const approvalDetractionFromElectric = new Power('', new Subtract('', One, commodities.electric.demandMet), new Constant('', 1.5))
 const approval = new Max('approval', Zero,
-  new Subtract('', One, new Add('', approvalDetractionFromHealth, approvalDetractionFromFood, approvalDetractionFromWater, approvalDetractionFromGoods))
+  new Subtract('', One, new Add('', approvalDetractionFromHealth, approvalDetractionFromFood, approvalDetractionFromWater, approvalDetractionFromGoods, approvalDetractionFromElectric))
 )
 
 const healthOverThirty = new Multiply('healthOverThirty', new Max('', Zero, new Subtract('', health, new Constant('healthBase', 0.3))), new Constant('', 100))
@@ -259,11 +289,13 @@ export const society = [
   ['temperature', temperature],
   ['health', health],
   ['approval', approval],
+  ['ai', aiification],
 ]
 society.materialismVar = materialismVar
 
 export let variables = new Map([
   [activeAiTasks, 0],
+  [aiResearch, 0],
   [aiification, 1.301029],
 
   [population, 8_174_511_828],
@@ -271,51 +303,58 @@ export let variables = new Map([
   [co2ppm, 421],
   [temperature, 1.3],
 
-  [wind.input, 65_000_000_000],
+  [wind.synthesizingAbility, 65_000_000_000],
   [wind.efficiency, 1],
 
-  [solar.input, 65_000_000_000],
+  [solar.synthesizingAbility, 65_000_000_000],
   [solar.efficiency, 1],
 
-  [nuclear.input, 65_000_000_000],
+  [nuclear.synthesizingAbility, 65_000_000_000],
   [nuclear.efficiency, 1],
 
-  [coal.input, 65_000_000_000],
+  [coal.synthesizingAbility, 65_000_000_000],
   [coal.efficiency, 1],
 
-  [oil.input, 120_000_000_000],
+  [oil.synthesizingAbility, 120_000_000_000],
   [oil.efficiency, 1],
 
+  [electric.synthesizingAbility, 1_000_000_000_000_000], // the indivdual inputs are the limiting factor
   [electric.efficiency, 1],
   [electricDemandFromWindModifier, 1],
   [electricDemandFromSolarModifier, 1],
   [electricDemandFromNuclearModifier, 1],
-  [electricDemandFromCoalModifier, 0.18420375896346108],
-  [electricDemandFromOilModifier, 0.12222344790657301],
+  [electricDemandFromCoalModifier, 1],
+  [electricDemandFromOilModifier, 0.0671],
 
+  [plastic.synthesizingAbility, 800_000_000],
   [plastic.efficiency, 1],
   [plasticDemandFromOilModifier, 1],
 
+  [water.synthesizingAbility, 35_000_000_000],
   [water.efficiency, 1],
   [waterDemandFromElectricModifier, 1],
 
+  [goods.synthesizingAbility, 400_000_000],
   [goods.efficiency, 1],
   [goodsDemandFromPlasticModifier, 1],
   [goodsDemandFromElectricModifier, 1],
   [goodsDemandFromWaterModifier, 1],
 
+  [grain.synthesizingAbility, 1_000_000_000_000],
   [grain.efficiency, 1],
   [grainDemandFromWaterModifier, 1],
 
+  [meat.synthesizingAbility, 1_000_000_000_000],
   [meat.efficiency, 1],
   [meatDemandFromWaterModifier, 1],
   [meatDemandFromGrainModifier, 1],
 
+  [agri.synthesizingAbility, 2_600_000_000],
   [agri.efficiency, 1],
-  [agriDemandFromGrainModifier, 0.1],
-  [agriDemandFromMeatModifier, 0.1],
+  [agriDemandFromGrainModifier, 0.9],
+  [agriDemandFromMeatModifier, 0.4],
 
-  [healthIndustry.input, 4_000_000_000],
+  [healthIndustry.synthesizingAbility, 1_000_000_000_000], // only exists to create optimization tension
   [healthIndustry.efficiency, 1],
 ])
 
@@ -359,7 +398,7 @@ export function optimizeElectricDemand() {
   // console.log('now', execute(electric.input))
 
   // for (let i = 0; i < 20; i++) {
-  optimize(electric._availableProduction, target * 1.05, new Map([
+  optimize(electric.availableProduction, target * 1.05, new Map([
     [coal.efficiency, 1],
     [coal.input, () => execute(commodities.coal.cost)],
     [wind.efficiency, 1],
@@ -373,8 +412,8 @@ export function optimizeElectricDemand() {
   ]), 0.01)
   // }
 
-  if (execute(plastic._availableProduction) < execute(plastic.demand) * 1.2) {
-    optimize(plastic._availableProduction, execute(plastic.demand) * 1.2, new Map([
+  if (execute(plastic.availableProduction) < execute(plastic.demand) * 1.2) {
+    optimize(plastic.availableProduction, execute(plastic.demand) * 1.2, new Map([
       [oil.efficiency, 1],
       [oil.input, 1],
       [plasticDemandFromOilModifier, 1],
